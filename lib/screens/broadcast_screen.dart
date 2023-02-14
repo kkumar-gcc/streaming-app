@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -5,6 +7,7 @@ import 'package:ombre/resources/firestore_methods.dart';
 import 'package:ombre/screens/welcome_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ombre/config/appid.dart';
+import 'package:http/http.dart' as http;
 
 class BroadcastScreen extends StatefulWidget {
   final bool isBroadcaster;
@@ -21,6 +24,8 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
   List<int> remoteUid = [];
   late final RtcEngine _engine;
   bool _localUserJoined = false;
+  bool switchCamera = true;
+  bool isMuted = false;
   @override
   void initState() {
     super.initState();
@@ -28,6 +33,23 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
   }
 
   final user = FirebaseAuth.instance.currentUser;
+  String baseUrl = "http://localhost:8080";
+  String? token;
+  Future<void> getToken() async {
+    final res = await http.get(
+      Uri.parse(
+        ('$baseUrl/rtc/${widget.channelId}/publisher/userAccount/${user!.uid}/'),
+      ),
+    );
+    if (res.statusCode == 200) {
+      setState(() {
+        token = res.body;
+        token = jsonDecode(token!)['rtcToken'];
+      });
+    } else {
+      debugPrint('Failed to fetch token');
+    }
+  }
 
   Future<void> initAgora() async {
     // retrieve permissions
@@ -58,7 +80,10 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
         setState(() {
           remoteUid.removeWhere((element) => element == uid);
         });
-      }, onTokenPrivilegeWillExpire: (RtcConnection connection, String token) {
+      }, onTokenPrivilegeWillExpire:
+          (RtcConnection connection, String token) async {
+        await getToken();
+        await _engine.renewToken(token);
         debugPrint(
             '[onTokenPrivilegeWillExpire] connection: ${connection.toJson()}, token: $token');
       }, onLeaveChannel: (RtcConnection connection, RtcStats stats) {
@@ -80,11 +105,30 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
     // if(defaultTargetPlatform==TargetPlatform.android){
     //   await []
     // }
+    await getToken();
     await _engine.joinChannelWithUserAccount(
-      token: tempToken,
+      token: token!,
       channelId: 'testing123',
       userAccount: user!.uid,
     );
+  }
+
+  void _switchCamera() {
+    _engine
+        .switchCamera()
+        .then((value) => {
+              setState(() => {switchCamera = !switchCamera})
+            })
+        .catchError((err) {
+      debugPrint('switchCamera $err');
+    });
+  }
+
+  void _onToggleMute() async {
+    setState(() {
+      isMuted = !isMuted;
+    });
+    await _engine.muteLocalAudioStream(isMuted);
   }
 
   _leaveChannel() async {
@@ -99,37 +143,52 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        await _leaveChannel();
-        return Future.value(true);
-      },
-      child: Scaffold(
-        body: Stack(
-          children: [
-            Center(
-              child: _remoteVideo(user),
-            ),
-            Align(
-              alignment: Alignment.topLeft,
-              child: SizedBox(
-                width: 100,
-                height: 150,
-                child: Center(
-                  child: ('${user!.uid}${user!.displayName}' ==
-                              widget.channelId) &&
-                          _localUserJoined
-                      ? AgoraVideoView(
-                          controller: VideoViewController(
-                            rtcEngine: _engine,
-                            canvas: const VideoCanvas(uid: 0),
-                          ),
-                        )
-                      : const CircularProgressIndicator(),
-                ),
+    return SafeArea(
+      child: WillPopScope(
+        onWillPop: () async {
+          await _leaveChannel();
+          return Future.value(true);
+        },
+        child: Scaffold(
+          body: Stack(
+            children: [
+              Center(
+                child:
+                    ('${user!.uid}${user!.displayName}' == widget.channelId) &&
+                            _localUserJoined
+                        ? AgoraVideoView(
+                            controller: VideoViewController(
+                              rtcEngine: _engine,
+                              canvas: const VideoCanvas(uid: 0),
+                            ),
+                          )
+                        : const CircularProgressIndicator(),
               ),
-            ),
-          ],
+              Center(
+                child: _remoteVideo(user),
+              ),
+              Center(
+                  child: Column(
+                children: [
+                  if ("${user!.uid}${user!.displayName}" == widget.channelId)
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        InkWell(
+                          onTap: _switchCamera,
+                          child: const Text('switch camera'),
+                        ),
+                        InkWell(
+                          onTap: _onToggleMute,
+                          child: Text(isMuted ? 'Un-mute' : 'Mute'),
+                        ),
+                      ],
+                    )
+                ],
+              )),
+            ],
+          ),
         ),
       ),
     );

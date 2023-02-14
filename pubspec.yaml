@@ -46,6 +46,7 @@ dependencies:
   dotted_border: ^2.0.0+3
   permission_handler: ^9.2.0
   agora_rtc_engine: ^6.1.0
+  http: ^0.13.5
 
 dev_dependencies:
   flutter_test:
