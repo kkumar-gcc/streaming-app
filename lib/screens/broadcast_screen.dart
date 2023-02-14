@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:ombre/resources/firestore_methods.dart';
 import 'package:ombre/screens/welcome_screen.dart';
+import 'package:ombre/widgets/loading_indicator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ombre/config/appid.dart';
 import 'package:http/http.dart' as http;
@@ -33,7 +34,7 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
   }
 
   final user = FirebaseAuth.instance.currentUser;
-  String baseUrl = "http://localhost:8080";
+  String baseUrl = "http://127.0.0.1:8080";
   String? token;
   Future<void> getToken() async {
     final res = await http.get(
@@ -54,7 +55,6 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
   Future<void> initAgora() async {
     // retrieve permissions
     await [Permission.microphone, Permission.camera].request();
-
     //create the engine
     _engine = createAgoraRtcEngine();
     await _engine.initialize(RtcEngineContext(
@@ -82,8 +82,8 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
         });
       }, onTokenPrivilegeWillExpire:
           (RtcConnection connection, String token) async {
-        await getToken();
-        await _engine.renewToken(token);
+        // await getToken();
+        // await _engine.renewToken(token);
         debugPrint(
             '[onTokenPrivilegeWillExpire] connection: ${connection.toJson()}, token: $token');
       }, onLeaveChannel: (RtcConnection connection, RtcStats stats) {
@@ -104,10 +104,10 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
     }
     // if(defaultTargetPlatform==TargetPlatform.android){
     //   await []
-    // }
-    await getToken();
+    // }=
+    // await getToken();
     await _engine.joinChannelWithUserAccount(
-      token: token!,
+      token: tempToken,
       channelId: 'testing123',
       userAccount: user!.uid,
     );
@@ -162,7 +162,7 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                               canvas: const VideoCanvas(uid: 0),
                             ),
                           )
-                        : const CircularProgressIndicator(),
+                        : const LoadingIndicator(),
               ),
               Center(
                 child: _remoteVideo(user),

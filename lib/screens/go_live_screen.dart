@@ -45,7 +45,9 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        elevation: 2.0,
+        elevation: 0.0,
+        backgroundColor: const Color(0xff8C8AFA),
+        foregroundColor: const Color(0xff01011F),
         title: const Text("Discover"),
         actions: <Widget>[
           IconButton(
@@ -84,30 +86,31 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
                             radius: const Radius.circular(10),
                             dashPattern: const [10, 4],
                             strokeCap: StrokeCap.round,
-                            color: Colors.blue.shade200,
+                            color: const Color(0xff01011F),
                             child: Container(
                               width: double.infinity,
                               height: 150,
                               decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.05),
+                                color:
+                                    const Color(0xff01011F).withOpacity(0.05),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
+                                children: const [
+                                  Icon(
                                     FontAwesomeIcons.folder,
-                                    color: Colors.blue,
+                                    color: Color(0xff01011F),
                                     size: 40,
                                   ),
-                                  const SizedBox(
+                                  SizedBox(
                                     height: 15,
                                   ),
                                   Text(
                                     'Select your thumbnail',
                                     style: TextStyle(
                                       fontSize: 15,
-                                      color: Colors.grey.shade700,
+                                      color: Color(0xff01011F),
                                     ),
                                   )
                                 ],
@@ -121,17 +124,15 @@ class _GoLiveScreenState extends State<GoLiveScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Title',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
                       const SizedBox(
                         height: 5,
                       ),
-                      CustomTextField(controller: _titleController)
+                      CustomTextField(
+                        labelText: 'title',
+                        textEditingController: _titleController,
+                        textColor: const Color(0xff01011F),
+                        accentColor: const Color(0xff01011F),
+                      )
                     ],
                   )
                 ],

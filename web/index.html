@@ -40,46 +40,13 @@
   <script src="flutter.js" defer></script>
 </head>
 <body>
-<!-- The core Firebase JS SDK is always required and must be listed first -->
-<script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js"></script>
 
-<!-- Add for Firebase Storage: https://pub.dev/packages/firebase_storage -->
-<script src="https://www.gstatic.com/firebasejs/11.0.11/firebase-storage.js"></script>
+  <script
+          src="AgoraRtcWrapper.bundle.js"
+          type="application/javascript"
+  >
 
-<!-- Add for Cloud Firestore: https://pub.dev/packages/cloud_firestore -->
-<script src="https://www.gstatic.com/firebasejs/4.3.2/firebase-firestore.js"></script>
-
-<!-- Add for Firebase Auth: https://pub.dev/packages/firebase_auth -->
-<script src="https://www.gstatic.com/firebasejs/4.2.6/firebase-auth.js"></script>
-
-<script type="module">
-
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-
-  const firebaseConfig = {
-
-    apiKey: "AIzaSyBkW25zTNAEOBivIHaQWWQj69fXV8qEZYE",
-
-    authDomain: "ombre-demo.firebaseapp.com",
-
-    projectId: "ombre-demo",
-
-    storageBucket: "ombre-demo.appspot.com",
-
-    messagingSenderId: "948402163540",
-
-    appId: "1:948402163540:web:806f68f4ffad01590642c1",
-
-    measurementId: "G-WJKGT7DZS4"
-
-  };
-
-
-  // Initialize Firebase
-
-  const app = initializeApp(firebaseConfig);
-
-</script>
+  </script>
   <script>
     window.addEventListener('load', function(ev) {
       // Download main.dart.js

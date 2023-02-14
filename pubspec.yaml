@@ -47,6 +47,7 @@ dependencies:
   permission_handler: ^9.2.0
   agora_rtc_engine: ^6.1.0
   http: ^0.13.5
+  timeago: ^3.3.0
 
 dev_dependencies:
   flutter_test:
