@@ -48,4 +48,22 @@ class FirestoreMethods {
     }
     return channelId;
   }
+
+  Future<void> updateViewCount(String id, bool isIncrease) async {
+    try {
+      await _firestore.collection('livestream').doc(id).update({
+        'viewers': FieldValue.increment(isIncrease ? 1 : -1),
+      });
+    } catch (e) {
+      debugPrint(e.toString());
+    }
+  }
+
+  Future<void> endLiveStream(String channelId) async {
+    try {
+      await _firestore.collection('livestream').doc(channelId).delete();
+    } catch (e) {
+      debugPrint(e.toString());
+    }
+  }
 }
