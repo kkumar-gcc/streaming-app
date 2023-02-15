@@ -2,10 +2,11 @@ import 'dart:convert';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:ombre/resources/firestore_methods.dart';
 import 'package:ombre/screens/welcome_screen.dart';
-import 'package:ombre/widgets/loading_indicator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ombre/config/appid.dart';
 import 'package:http/http.dart' as http;
@@ -13,6 +14,7 @@ import 'package:http/http.dart' as http;
 class BroadcastScreen extends StatefulWidget {
   final bool isBroadcaster;
   final String channelId;
+
   const BroadcastScreen(
       {Key? key, required this.isBroadcaster, required this.channelId})
       : super(key: key);
@@ -24,9 +26,9 @@ class BroadcastScreen extends StatefulWidget {
 class _BroadcastScreenState extends State<BroadcastScreen> {
   List<int> remoteUid = [];
   late final RtcEngine _engine;
-  bool _localUserJoined = false;
   bool switchCamera = true;
   bool isMuted = false;
+  bool isCameraOn = true;
   @override
   void initState() {
     super.initState();
@@ -34,7 +36,7 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
   }
 
   final user = FirebaseAuth.instance.currentUser;
-  String baseUrl = "http://127.0.0.1:8080";
+  String baseUrl = "https://ombre-server-production.up.railway.app";
   String? token;
   Future<void> getToken() async {
     final res = await http.get(
@@ -67,7 +69,6 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
         debugPrint("local user ${connection.localUid} joined");
         setState(() {
           // remoteUid.add(connection.localUid!);
-          _localUserJoined = true;
         });
       }, onUserJoined: (RtcConnection connection, int uid, int elapsed) {
         debugPrint("remote user $uid joined");
@@ -82,8 +83,8 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
         });
       }, onTokenPrivilegeWillExpire:
           (RtcConnection connection, String token) async {
-        // await getToken();
-        // await _engine.renewToken(token);
+        await getToken();
+        await _engine.renewToken(token);
         debugPrint(
             '[onTokenPrivilegeWillExpire] connection: ${connection.toJson()}, token: $token');
       }, onLeaveChannel: (RtcConnection connection, RtcStats stats) {
@@ -102,13 +103,10 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
     } else {
       await _engine.setClientRole(role: ClientRoleType.clientRoleAudience);
     }
-    // if(defaultTargetPlatform==TargetPlatform.android){
-    //   await []
-    // }=
-    // await getToken();
+    await getToken();
     await _engine.joinChannelWithUserAccount(
-      token: tempToken,
-      channelId: 'testing123',
+      token: token!,
+      channelId: widget.channelId,
       userAccount: user!.uid,
     );
   }
@@ -131,6 +129,13 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
     await _engine.muteLocalAudioStream(isMuted);
   }
 
+  void _onToggleCamera() async {
+    setState(() {
+      isCameraOn = !isCameraOn;
+    });
+    await _engine.muteLocalAudioStream(isCameraOn);
+  }
+
   _leaveChannel() async {
     await _engine.leaveChannel();
     if ('${user!.uid}${user!.displayName}' == widget.channelId) {
@@ -138,6 +143,7 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
     } else {
       await FirestoreMethods().updateViewCount(widget.channelId, false);
     }
+    if (!mounted) return;
     Navigator.pushReplacementNamed(context, WelcomeScreen.routeName);
   }
 
@@ -152,41 +158,101 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
         child: Scaffold(
           body: Stack(
             children: [
-              Center(
-                child:
-                    ('${user!.uid}${user!.displayName}' == widget.channelId) &&
-                            _localUserJoined
-                        ? AgoraVideoView(
-                            controller: VideoViewController(
-                              rtcEngine: _engine,
-                              canvas: const VideoCanvas(uid: 0),
+              _remoteVideo(user),
+              Positioned(
+                top: 10,
+                left: 8,
+                child: Card(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20.0),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: const [
+                          Icon(
+                            FontAwesomeIcons.eye,
+                            color: Color(0xff8C8AFA),
+                            size: 16,
+                          ),
+                          SizedBox(
+                            width: 8,
+                          ),
+                          Text(
+                            '0 watching',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
-                          )
-                        : const LoadingIndicator(),
+                          ),
+                        ],
+                      ),
+                    )),
               ),
-              Center(
-                child: _remoteVideo(user),
-              ),
-              Center(
-                  child: Column(
-                children: [
-                  if ("${user!.uid}${user!.displayName}" == widget.channelId)
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        InkWell(
-                          onTap: _switchCamera,
-                          child: const Text('switch camera'),
+              if ("${user!.uid}${user!.displayName}" == widget.channelId)
+                Positioned(
+                  bottom: 10,
+                  left: 0,
+                  right: 0,
+                  height: 70,
+                  child: Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30.0),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                FontAwesomeIcons.cameraRotate,
+                                color: Color(0xff8C8AFA),
+                              ),
+                              tooltip: 'Switch Camera',
+                              onPressed: _switchCamera,
+                            ),
+                            IconButton(
+                              icon: isCameraOn
+                                  ? const Icon(
+                                      FontAwesomeIcons.video,
+                                      color: Colors.white,
+                                    )
+                                  : const Icon(
+                                      FontAwesomeIcons.videoSlash,
+                                      color: Color(0xff8C8AFA),
+                                    ),
+                              tooltip: 'Switch Camera',
+                              onPressed: _onToggleCamera,
+                            ),
+                            IconButton(
+                              icon: isMuted
+                                  ? const Icon(
+                                      FontAwesomeIcons.microphoneSlash,
+                                      color: Color(0xff8C8AFA),
+                                    )
+                                  : const Icon(
+                                      FontAwesomeIcons.microphone,
+                                      color: Colors.white,
+                                    ),
+                              tooltip: 'Switch Camera',
+                              onPressed: _onToggleMute,
+                            ),
+                            ElevatedButton(
+                              style: const ButtonStyle(
+                                backgroundColor:
+                                    MaterialStatePropertyAll<Color>(Colors.red),
+                              ),
+                              onPressed: () async {
+                                await _leaveChannel();
+                              },
+                              child: const Text("End Live"),
+                            ),
+                          ],
                         ),
-                        InkWell(
-                          onTap: _onToggleMute,
-                          child: Text(isMuted ? 'Un-mute' : 'Mute'),
-                        ),
-                      ],
-                    )
-                ],
-              )),
+                      )),
+                ),
             ],
           ),
         ),
@@ -195,19 +261,36 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
   }
 
   _remoteVideo(user) {
-    if (remoteUid.isNotEmpty) {
-      return AgoraVideoView(
-        controller: VideoViewController.remote(
-          rtcEngine: _engine,
-          canvas: VideoCanvas(uid: remoteUid[0]),
-          connection: const RtcConnection(channelId: "testing123"),
-        ),
-      );
-    } else {
-      return const Text(
-        'Please wait for remote user to join',
-        textAlign: TextAlign.center,
-      );
-    }
+    return SizedBox(
+      width: MediaQuery.of(context).size.width,
+      height: MediaQuery.of(context).size.height,
+      child: "${user.uid}${user.displayName}" == widget.channelId
+          ? AgoraVideoView(
+              controller: VideoViewController(
+                rtcEngine: _engine,
+                canvas: const VideoCanvas(uid: 0),
+                useAndroidSurfaceView: true,
+              ),
+            )
+          : remoteUid.isNotEmpty
+              ? kIsWeb
+                  ? AgoraVideoView(
+                      controller: VideoViewController.remote(
+                        rtcEngine: _engine,
+                        canvas: VideoCanvas(uid: remoteUid[0]),
+                        useAndroidSurfaceView: true,
+                        connection: RtcConnection(channelId: widget.channelId),
+                      ),
+                    )
+                  : AgoraVideoView(
+                      controller: VideoViewController.remote(
+                        rtcEngine: _engine,
+                        canvas: VideoCanvas(uid: remoteUid[0]),
+                        useFlutterTexture: true,
+                        connection: RtcConnection(channelId: widget.channelId),
+                      ),
+                    )
+              : Container(),
+    );
   }
 }

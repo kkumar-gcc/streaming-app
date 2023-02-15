@@ -23,8 +23,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final navigator = Navigator.of(context); // <- Add this
-
     return Scaffold(
       appBar: AppBar(
         elevation: 0.0,
@@ -83,7 +81,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           onTap: () async {
                             await FirestoreMethods()
                                 .updateViewCount(post.channelId, true);
-                            navigator.push(
+                            if (!mounted) return;
+                            Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (context) => BroadcastScreen(
                                   isBroadcaster: false,
@@ -142,13 +141,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         itemCount: snapshot.data.docs.length,
                         itemBuilder: (context, index) {
                           LiveStream post = LiveStream.fromMap(
-                              snapshot.data.docs[index].data());
+                            snapshot.data.docs[index].data(),
+                          );
 
                           return InkWell(
                               onTap: () async {
                                 await FirestoreMethods()
                                     .updateViewCount(post.channelId, true);
-                                navigator.push(
+                                if (!mounted) return;
+                                Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (context) => BroadcastScreen(
                                       isBroadcaster: false,
@@ -168,19 +169,62 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      // Image(image: post.image),
-                                      ClipRRect(
-                                        borderRadius: const BorderRadius.only(
-                                          topLeft: Radius.circular(20.0),
-                                          topRight: Radius.circular(20.0),
-                                        ),
-                                        child: Image.network(
-                                          post.image,
-                                          width:
-                                              MediaQuery.of(context).size.width,
-                                          height: 250.0,
-                                          fit: BoxFit.fill,
-                                        ),
+                                      Stack(
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius:
+                                                const BorderRadius.only(
+                                              topLeft: Radius.circular(20.0),
+                                              topRight: Radius.circular(20.0),
+                                            ),
+                                            child: Image.network(
+                                              post.image,
+                                              width: MediaQuery.of(context)
+                                                  .size
+                                                  .width,
+                                              height: 250.0,
+                                              fit: BoxFit.fill,
+                                            ),
+                                          ),
+                                          Positioned(
+                                            top: 20,
+                                            left: 8,
+                                            child: Card(
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          20.0),
+                                                ),
+                                                child: Padding(
+                                                  padding: const EdgeInsets.all(
+                                                      12.0),
+                                                  child: Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .spaceBetween,
+                                                    children: [
+                                                      const Icon(
+                                                        FontAwesomeIcons.eye,
+                                                        color:
+                                                            Color(0xff7d78d2),
+                                                        size: 16,
+                                                      ),
+                                                      const SizedBox(
+                                                        width: 8,
+                                                      ),
+                                                      Text(
+                                                        '${post.viewers} watching',
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          color: Colors.white,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                )),
+                                          ),
+                                        ],
                                       ),
                                       Padding(
                                         padding: const EdgeInsets.all(12.0),
@@ -218,13 +262,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                                 ),
                                               ],
                                             ),
-                                            // Text(
-                                            //   '${post.viewers} watching',
-                                            //   style: const TextStyle(
-                                            //     fontWeight: FontWeight.bold,
-                                            //     color: Colors.white,
-                                            //   ),
-                                            // ),
+
                                             // Text(
                                             //   'Started ${timeago.format(post.startedAt.toDate())}',
                                             //   style: const TextStyle(
