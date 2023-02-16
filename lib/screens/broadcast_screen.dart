@@ -1,12 +1,14 @@
 import 'dart:convert';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:ombre/models/livestream.dart';
 import 'package:ombre/resources/firestore_methods.dart';
-import 'package:ombre/screens/welcome_screen.dart';
+import 'package:ombre/widgets/loading_indicator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ombre/config/appid.dart';
 import 'package:http/http.dart' as http;
@@ -29,6 +31,7 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
   bool switchCamera = true;
   bool isMuted = false;
   bool isCameraOn = true;
+  bool isAgoraInitialised = false;
   @override
   void initState() {
     super.initState();
@@ -38,6 +41,7 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
   final user = FirebaseAuth.instance.currentUser;
   String baseUrl = "https://ombre-server-production.up.railway.app";
   String? token;
+
   Future<void> getToken() async {
     final res = await http.get(
       Uri.parse(
@@ -103,6 +107,9 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
     } else {
       await _engine.setClientRole(role: ClientRoleType.clientRoleAudience);
     }
+    setState(() {
+      isAgoraInitialised = true;
+    });
     await getToken();
     await _engine.joinChannelWithUserAccount(
       token: token!,
@@ -133,7 +140,7 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
     setState(() {
       isCameraOn = !isCameraOn;
     });
-    await _engine.muteLocalAudioStream(isCameraOn);
+    await _engine.muteLocalVideoStream(isCameraOn);
   }
 
   _leaveChannel() async {
@@ -144,7 +151,7 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
       await FirestoreMethods().updateViewCount(widget.channelId, false);
     }
     if (!mounted) return;
-    Navigator.pushReplacementNamed(context, WelcomeScreen.routeName);
+    Navigator.pop(context);
   }
 
   @override
@@ -159,37 +166,45 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
           body: Stack(
             children: [
               _remoteVideo(user),
-              Positioned(
-                top: 10,
-                left: 8,
-                child: Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20.0),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: const [
-                          Icon(
-                            FontAwesomeIcons.eye,
-                            color: Color(0xff8C8AFA),
-                            size: 16,
+              StreamBuilder<dynamic>(
+                  stream: FirebaseFirestore.instance
+                      .collection('livestream')
+                      .doc(widget.channelId)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    LiveStream post = LiveStream.fromMap(snapshot.data.data());
+                    return Positioned(
+                      top: 10,
+                      left: 8,
+                      child: Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20.0),
                           ),
-                          SizedBox(
-                            width: 8,
-                          ),
-                          Text(
-                            '0 watching',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Icon(
+                                  FontAwesomeIcons.eye,
+                                  color: Color(0xff8C8AFA),
+                                  size: 16,
+                                ),
+                                const SizedBox(
+                                  width: 8,
+                                ),
+                                Text(
+                                  '${post.viewers} watching',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
-                    )),
-              ),
+                          )),
+                    );
+                  }),
               if ("${user!.uid}${user!.displayName}" == widget.channelId)
                 Positioned(
                   bottom: 10,
@@ -253,6 +268,21 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                         ),
                       )),
                 ),
+              if ("${user!.uid}${user!.displayName}" != widget.channelId)
+                Positioned(
+                  top: 10,
+                  right: 8,
+                  child: ElevatedButton(
+                    style: const ButtonStyle(
+                      backgroundColor:
+                          MaterialStatePropertyAll<Color>(Colors.red),
+                    ),
+                    onPressed: () async {
+                      await _leaveChannel();
+                    },
+                    child: const Text("Leave"),
+                  ),
+                ),
             ],
           ),
         ),
@@ -261,36 +291,41 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
   }
 
   _remoteVideo(user) {
-    return SizedBox(
-      width: MediaQuery.of(context).size.width,
-      height: MediaQuery.of(context).size.height,
-      child: "${user.uid}${user.displayName}" == widget.channelId
-          ? AgoraVideoView(
-              controller: VideoViewController(
-                rtcEngine: _engine,
-                canvas: const VideoCanvas(uid: 0),
-                useAndroidSurfaceView: true,
-              ),
-            )
-          : remoteUid.isNotEmpty
-              ? kIsWeb
-                  ? AgoraVideoView(
-                      controller: VideoViewController.remote(
-                        rtcEngine: _engine,
-                        canvas: VideoCanvas(uid: remoteUid[0]),
-                        useAndroidSurfaceView: true,
-                        connection: RtcConnection(channelId: widget.channelId),
-                      ),
-                    )
-                  : AgoraVideoView(
-                      controller: VideoViewController.remote(
-                        rtcEngine: _engine,
-                        canvas: VideoCanvas(uid: remoteUid[0]),
-                        useFlutterTexture: true,
-                        connection: RtcConnection(channelId: widget.channelId),
-                      ),
-                    )
-              : Container(),
-    );
+    if (isAgoraInitialised) {
+      return SizedBox(
+        width: MediaQuery.of(context).size.width,
+        height: MediaQuery.of(context).size.height,
+        child: "${user.uid}${user.displayName}" == widget.channelId
+            ? AgoraVideoView(
+                controller: VideoViewController(
+                  rtcEngine: _engine,
+                  canvas: const VideoCanvas(uid: 0),
+                ),
+              )
+            : remoteUid.isNotEmpty
+                ? kIsWeb
+                    ? AgoraVideoView(
+                        controller: VideoViewController.remote(
+                          rtcEngine: _engine,
+                          canvas: VideoCanvas(uid: remoteUid[0]),
+                          useFlutterTexture: true,
+                          connection:
+                              RtcConnection(channelId: widget.channelId),
+                        ),
+                      )
+                    : AgoraVideoView(
+                        controller: VideoViewController.remote(
+                          rtcEngine: _engine,
+                          canvas: VideoCanvas(uid: remoteUid[0]),
+                          useAndroidSurfaceView: true,
+                          connection:
+                              RtcConnection(channelId: widget.channelId),
+                        ),
+                      )
+                : Container(),
+      );
+    } else {
+      return const LoadingIndicator();
+    }
   }
 }
